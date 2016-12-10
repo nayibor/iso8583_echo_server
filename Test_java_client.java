@@ -54,7 +54,7 @@ public class Test_java_client {
  * 
  * 
 * to compile in new changes
-*javac -cp .:/home/nuku/Documents/PROJECTS/java/jPOS/jpos/build/libs/jpos-2.0.7-SNAPSHOT.jar Test_java_client.java 
+*javac -cp .:jpos-2.0.7-SNAPSHOT.jar Test_java_client.java 
 *to run new changes 
-* java -Xbootclasspath/p:/home/nuku/Documents/PROJECTS/java/jPOS/jpos/build/libs/jpos-2.0.7-SNAPSHOT.jar Test_java_client
+* java -Xbootclasspath/p:jpos-2.0.7-SNAPSHOT.jar Test_java_client
 **/
