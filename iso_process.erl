@@ -79,7 +79,7 @@ send_message(Message)->
 process_message(Rest)->		
 		Mti_size = ?MTI_SIZE,
 		Primary_Bitmap_size = ?PRIMARY_BITMAP_SIZE,
-		io:format("~nrequest_mti : ~p",[lists:sublist(Rest,Mti_size)]),		
+		%%io:format("~nrequest_mti : ~p",[lists:sublist(Rest,Mti_size)]),		
 		Bitmap_size = case lists:nth(1,string:right(integer_to_list(list_to_integer([lists:nth(5,Rest)],16),2),4,$0)) of
 						48 -> 16;
 						49 -> 32
