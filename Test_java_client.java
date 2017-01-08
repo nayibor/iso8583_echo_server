@@ -12,7 +12,7 @@ public class Test_java_client {
 	public static void main (String[] args) throws Exception {
 		Logger logger = new Logger();
 		logger.addListener (new SimpleLogListener (System.out));
-		ISOChannel channel = new ASCIIChannel ("localhost", 8002, new GenericPackager("iso93ascii.xml"));
+		ISOChannel channel = new ASCIIChannel ("localhost", Integer.parseInt(args[0]), new GenericPackager("iso93ascii.xml"));
 		((LogSource)channel).setLogger (logger, "test-channel");
 		channel.connect ();
 		//GenericPackager packager = new GenericPackager("iso93ascii.xml");
@@ -56,5 +56,5 @@ public class Test_java_client {
 * to compile in new changes
 *javac -cp .:jpos-2.0.7-SNAPSHOT.jar Test_java_client.java 
 *to run new changes 
-* java -Xbootclasspath/p:jpos-2.0.7-SNAPSHOT.jar Test_java_client
+* java -Xbootclasspath/p:jpos-2.0.7-SNAPSHOT.jar Test_java_client 8002
 **/
