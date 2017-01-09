@@ -77,26 +77,35 @@ send_message(Message)->
 		
 
 %% @doc this part accepts a 1993 ascii iso8583 message and extracts the mti,bitmap,data elements into a map object 
-%% exceptions can be thrown here if the string for the message hasnt been formatted well but they should be caught in whichever code is calling the system 
+%% exceptions can be thrown here if the string for the message hasnt been formatted well but they should be caught in whichever code is calling this function
 -spec process_message([pos_integer()])->map().		
 process_message(Rest)->		
-		Mti_size = ?MTI_SIZE,
-		Primary_Bitmap_size = ?PRIMARY_BITMAP_SIZE,
-		%%io:format("~nrequest_mti : ~p",[lists:sublist(Rest,Mti_size)]),		
-		Bitmap_size = case lists:nth(1,string:right(integer_to_list(list_to_integer([lists:nth(5,Rest)],16),2),4,$0)) of
+		
+		Fthdig = [lists:nth(5,Rest)] ,
+		Fth_base16 = list_to_integer(Fthdig,16),
+		Fth_base2 = integer_to_list(Fth_base16,2),
+		Pad_left_z_basetwo = string:right(Fth_base2,4,$0),
+		Bitmap_test_num = lists:nth(1,Pad_left_z_basetwo),        
+		Bitmap_size = case Bitmap_test_num of
 						48 -> 16;
 						49 -> 32
 						end,
-		%%io:format("~n~nbitmap size is:~p",[Bitmap_size]),
-		%%io:format("~nbmp vals:~p~nraw vals:~w~nvals:~p",[lists:map(fun(X)->string:right(integer_to_list(list_to_integer([X],16),2),4,$0)end,lists:sublist(Rest,Mti_size+1,Bitmap_size)),lists:sublist(Rest,Mti_size+1,Bitmap_size),lists:sublist(Rest,Mti_size+1,Bitmap_size)]),
-		Bitmap_transaction = lists:flatten(lists:map(fun(X)->string:right(integer_to_list(list_to_integer([X],16),2),4,$0)end,lists:sublist(Rest,Mti_size+1,Bitmap_size))),
+		
+		Bitmap_Segment = lists:sublist(Rest,?MTI_SIZE+1,Bitmap_size),
+		Fun_ret_bitmap_binary_elem = fun(X)->
+										Sing_item = list_to_integer([X],16),
+										Integer_sing_item = integer_to_list(Sing_item,2), 	
+										string:right(Integer_sing_item,4,$0)
+									  end ,
+		Bitmap_list_raw = lists:map(Fun_ret_bitmap_binary_elem,Bitmap_Segment),
+		Bitmap_transaction = lists:flatten(Bitmap_list_raw),
 		
 		%%add bitmap as well as mti to map which holds data elements so they can help in processing rules 
-		Mti_Data_Element = maps:from_list([{ftype,ans},{fld_no,0},{name,<<"Mti">>},{val_list_form,lists:sublist(Rest,Mti_size)}]),
-		Bitmap_Data_ELement = maps:from_list([{ftype,b},{fld_no,1},{name,<<"Bitmap">>},{val_binary_form,Bitmap_transaction},{val_list_form,lists:sublist(Rest,Mti_size+1,Bitmap_size)}]),
+		Mti_Data_Element = maps:from_list([{ftype,ans},{fld_no,0},{name,<<"Mti">>},{val_list_form,lists:sublist(Rest,?MTI_SIZE)}]),
+		Bitmap_Data_ELement = maps:from_list([{ftype,b},{fld_no,1},{name,<<"Bitmap">>},{val_binary_form,Bitmap_transaction},{val_list_form,lists:sublist(Rest,?MTI_SIZE+1,Bitmap_size)}]),
 		Map_Data_Element1 =  maps:put(<<"_mti">>,Mti_Data_Element,maps:new()), 
 		Map_Data_Element = maps:put(<<"_bitmap">>,Bitmap_Data_ELement,Map_Data_Element1),
-		Start_index = Mti_size+Primary_Bitmap_size+1,
+		Start_index = ?MTI_SIZE+?PRIMARY_BITMAP_SIZE+1,
 		%%io:format("~nkeys and values so far are ~p",[Map_Data_Element]),
 		OutData = lists:foldl(fun(X,_Acc={Data_for_use_in,Index_start_in,Current_index_in,Map_out_list_in}) when X =:= 49->						
 								    {Ftype,Flength,Fx_var_fixed,Fx_header_length,DataElemName}=get_spec_field(Current_index_in),
