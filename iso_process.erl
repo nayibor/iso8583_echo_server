@@ -39,7 +39,9 @@ loop_listen(Listen_socket)->
 loop_receive(Socket,Isom)->
 		receive
 			{tcp, Socket, Message} ->
-				State_new=Isom++Message,
+				
+				State_new = string:concat(Isom,Message),
+				io:format("~ndata is ~p and length is ~p",[State_new,length(State_new)]),
 				case length(State_new) of 
 					Size when Size < ?BH ->
 						inet:setopts(Socket, [{active, once}]),
@@ -68,6 +70,7 @@ loop_receive(Socket,Isom)->
 %% @doc this part is for sending iso messages for parsing 
 %% sample message to send on command line try
 %% iso_process:send_message("01581200F230040102B0000000000000040000001012312313122012340000100000001107221800000001170108222726FABCDE123ABD06414243000termid1210Community106A5DFGR1112341234234").
+%%Yellow1 = <<Red/binary,Blue/binary,Green/binary,<<"1">>/binary>> 
 -spec send_message([pos_integer()])->{error,term()} | fun(). 			
 send_message(Message)->
 		{ok, Socket} = gen_tcp:connect("localhost", ?PORT, [list, {packet, 0},{active, once}]),
