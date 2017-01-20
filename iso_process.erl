@@ -35,13 +35,11 @@ loop_listen(Listen_socket)->
 		
 
 %% @doc this part is for the acceptor socket 
--spec loop_receive(port(),[])->[pos_integer()] | {error,term()} | fun(). 		
+-spec loop_receive(port(),[pos_integer()])->term() | {error,term()} | fun(). 		
 loop_receive(Socket,Isom)->
 		receive
 			{tcp, Socket, Message} ->
-				
-				State_new = string:concat(Isom,Message),
-				io:format("~ndata is ~p and length is ~p",[State_new,length(State_new)]),
+				State_new = lists:flatten([Isom|Message]),
 				case length(State_new) of 
 					Size when Size < ?BH ->
 						inet:setopts(Socket, [{active, once}]),
@@ -64,13 +62,10 @@ loop_receive(Socket,Isom)->
 				io:format("Server socket closed~n" );
 			{tcp_error, _Socket, _}->
 				io:format("Error closed~n" )					
-		end.						
+		end.					
 								
 	
 %% @doc this part is for sending iso messages for parsing 
-%% sample message to send on command line try
-%% iso_process:send_message("01581200F230040102B0000000000000040000001012312313122012340000100000001107221800000001170108222726FABCDE123ABD06414243000termid1210Community106A5DFGR1112341234234").
-%%Yellow1 = <<Red/binary,Blue/binary,Green/binary,<<"1">>/binary>> 
 -spec send_message([pos_integer()])->{error,term()} | fun(). 			
 send_message(Message)->
 		{ok, Socket} = gen_tcp:connect("localhost", ?PORT, [list, {packet, 0},{active, once}]),
@@ -111,7 +106,7 @@ process_message(Rest)->
 		Start_index = ?MTI_SIZE+?PRIMARY_BITMAP_SIZE+1,
 		%%io:format("~nkeys and values so far are ~p",[Map_Data_Element]),
 		OutData = lists:foldl(fun(X,_Acc={Data_for_use_in,Index_start_in,Current_index_in,Map_out_list_in}) when X =:= 49->						
-								    {Ftype,Flength,Fx_var_fixed,Fx_header_length,DataElemName}=get_spec_field(Current_index_in),
+								    {Ftype,Flength,Fx_var_fixed,Fx_header_length,DataElemName} = get_spec_field(Current_index_in),
 									case Fx_var_fixed of
 										fx -> 
 											Data_Element = lists:sublist(Data_for_use_in,Index_start_in,Flength),

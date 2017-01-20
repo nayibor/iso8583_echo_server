@@ -33,7 +33,7 @@ public class Test_java_client {
 		m.set(22,"FABCDE123ABD");
 		
 
-		for (int i=1;i<=1;i++)
+		for (int i=1;i<=3;i++)
 		{
 		Date today = new Date();
 		SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("yyMMddHHmmss");
