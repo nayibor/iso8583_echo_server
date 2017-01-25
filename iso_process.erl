@@ -9,7 +9,7 @@
 -module(iso_process).
 
 
--export([start_iso_server/0,send_message/1]).
+-export([start_iso_server/0,send_message/1,pad_data/3]).
 
 
 -define(MTI_SIZE,4).
@@ -39,7 +39,7 @@ loop_listen(Listen_socket)->
 loop_receive(Socket,Isom)->
 		receive
 			{tcp, Socket, Message} ->
-				State_new = lists:flatten([Isom|Message]),
+				State_new = Isom++Message,
 				case length(State_new) of 
 					Size when Size < ?BH ->
 						inet:setopts(Socket, [{active, once}]),
@@ -49,7 +49,7 @@ loop_receive(Socket,Isom)->
 						Len = erlang:list_to_integer(LenStr)+?BH,
 						case length(State_new) of 
 							SizeafterHead when Len =:= SizeafterHead ->
-								Response_message = process_message(Rest),
+								Response_message = process_message({binary,Rest}),
 								io:format("~nParsed Iso Map~n ~p~n",[Response_message]),
 								inet:setopts(Socket, [{active, once}]),
 								loop_receive(Socket,[]);
@@ -73,11 +73,35 @@ send_message(Message)->
 		ok = gen_tcp:close(Socket).
 		
 		
+-spec process_message([{list | binary,pos_integer()}])->map().			
+%% @doc this part is for usage of binaries		
+process_message({binary,Rest})-> 
+		 Bin_message = erlang:list_to_binary(Rest),
+		 io:format("~nmessageis ~p",[Bin_message]),
+		 Fthdig = binary:part(Bin_message,4,1),
+		 Fth_base16 = erlang:binary_to_integer(Fthdig,16),
+		 Fth_base2 = erlang:integer_to_binary(Fth_base16,2),
+		 Pad_left_z_basetwo  = pad_data(Fth_base2,4,<<"0">>),
+		 io:format("~n4base pad is ~p",[Pad_left_z_basetwo]),
+		 Bitmap_test_num = binary:part(Pad_left_z_basetwo,0,1),
+		 Bitmap_size = case Bitmap_test_num of
+							<<"0">> -> 16;
+							<<"1">> -> 32
+						end,
+		Bitmap_Segment = binary:part(Bin_message,?MTI_SIZE,Bitmap_size),
+		Bitmap_transaction = << << (convert_base(One)):4/binary >>  || <<One:1/binary>> <= Bitmap_Segment >>,
+		
+		%%add bitmap as well as mti to map which holds data elements so they can help in processing rules 
+		Mti_Data_Element = maps:from_list([{ftype,ans},{fld_no,0},{name,<<"Mti">>},{val_binary_form,binary:part(Bin_message,0,?MTI_SIZE)}]),
+		Bitmap_Data_ELement = maps:from_list([{ftype,b},{fld_no,1},{name,<<"Bitmap">>},{val_binary_form,Bitmap_transaction},{val_hex_form,Bitmap_Segment}]),
+		Map_Data_Element1 =  maps:put(<<"_mti">>,Mti_Data_Element,maps:new()), 
+		Map_Data_Element = maps:put(<<"_bitmap">>,Bitmap_Data_ELement,Map_Data_Element1),
+		Start_index = ?MTI_SIZE+Bitmap_size,
+		{Map_Data_Element,Start_index};
 
 %% @doc this part accepts a 1993 ascii iso8583 message and extracts the mti,bitmap,data elements into a map object 
 %% exceptions can be thrown here if the string for the message hasnt been formatted well but they should be caught in whichever code is calling this function
--spec process_message([pos_integer()])->map().		
-process_message(Rest)->		
+process_message({list,Rest})->		
 		
 		Fthdig = [lists:nth(5,Rest)] ,
 		Fth_base16 = list_to_integer(Fthdig,16),
@@ -265,4 +289,17 @@ get_spec_field(DataElem)->
 			126	->{ans,255,vl,3,<<"Reserved For Iso Use">>}				
 		end .
 
+%%this is for padding a binary up to a length of N digits with a binary character
+%%mostly used in the bitmap
+%%pad character size <2
+
+pad_data(Bin,Number,Character)when is_binary(Bin),is_integer(Number),Number > 0,is_binary(Character),size(Character)<2 -> pad_data(Bin,Number,Character,Number-size(Bin)).
+pad_data(Bin,Number,Character,Counter) when Counter > 0 -> pad_data(<<Character/binary,Bin/binary>>,Number,Character,Counter-1);
+pad_data(Bin,_Number,_Character,Counter) when Counter =< 0 -> Bin.
+
+%%this is for creating correct interpretation of the bitmap for a binary 
+convert_base(Data_Base_16)->
+		Fth_base16 = erlang:binary_to_integer(Data_Base_16,16),
+		Data_base2 = erlang:integer_to_binary(Fth_base16,2),
+		pad_data(Data_base2,4,<<"0">>).
 
