@@ -1,0 +1,7 @@
+%% sample message to send on command line try
+%% iso_process:send_message("01581200F230040102B0000000000000040000001012312313122012340000100000001107221800000001170108222726FABCDE123ABD06414243000termid1210Community106A5DFGR1112341234234").
+%%Yellow1 = <<Red/binary,Blue/binary,Green/binary,<<"1">>/binary>> 
+
+<< <<One/binary>> || <<One:1/binary>> <= <<"123">> >>
+Bitmap_list_raw = << << (convert_base(One)):4/binary >>  || <<One:1/binary>> <= Bitmap_Segment >>;
+

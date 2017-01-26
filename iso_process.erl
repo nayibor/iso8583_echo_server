@@ -9,7 +9,7 @@
 -module(iso_process).
 
 
--export([start_iso_server/0,send_message/1,pad_data/3]).
+-export([start_iso_server/0,send_message/1,pad_data/3,fold_bin/3]).
 
 
 -define(MTI_SIZE,4).
@@ -73,16 +73,37 @@ send_message(Message)->
 		ok = gen_tcp:close(Socket).
 		
 		
+%process_binary(Fun,Accum_i,Init_Bin,Chop_size) when size(Init_Bin) > 0->
+%		 << Bin_i:Chop_size/binary,Rest/binary >> = Init_Bin ,
+%		Accum_new = Fun(Accum_i,Bin_i),
+%		process_binary(Fun,Accum_new,Rest,Chop_size);
+		
+			
+%process_binary(_Fun,Accum_i,<<>>,_Chop_size)-> Accum_i.
+
+
+-spec fold_bin(Fun, T, Bin) -> T when
+	Fun  		:: fun((Input, T) -> {Reminder, T}),
+	Bin  		:: binary(),
+	Input		:: binary(),
+	Reminder	:: binary().
+%% base case first
+fold_bin(_Fun, Accum, <<>>) -> Accum;
+fold_bin(Fun, Accum, Bin) ->
+		{NewBin, NewAccum} = Fun(Bin, Accum),
+		fold_bin(Fun, NewAccum, NewBin).
+
+
 -spec process_message([{list | binary,pos_integer()}])->map().			
 %% @doc this part is for usage of binaries		
 process_message({binary,Rest})-> 
 		 Bin_message = erlang:list_to_binary(Rest),
-		 io:format("~nmessageis ~p",[Bin_message]),
+		 %%io:format("~nmessageis ~p",[Bin_message]),
 		 Fthdig = binary:part(Bin_message,4,1),
 		 Fth_base16 = erlang:binary_to_integer(Fthdig,16),
 		 Fth_base2 = erlang:integer_to_binary(Fth_base16,2),
 		 Pad_left_z_basetwo  = pad_data(Fth_base2,4,<<"0">>),
-		 io:format("~n4base pad is ~p",[Pad_left_z_basetwo]),
+		 %%io:format("~n4base pad is ~p",[Pad_left_z_basetwo]),
 		 Bitmap_test_num = binary:part(Pad_left_z_basetwo,0,1),
 		 Bitmap_size = case Bitmap_test_num of
 							<<"0">> -> 16;
@@ -96,8 +117,36 @@ process_message({binary,Rest})->
 		Bitmap_Data_ELement = maps:from_list([{ftype,b},{fld_no,1},{name,<<"Bitmap">>},{val_binary_form,Bitmap_transaction},{val_hex_form,Bitmap_Segment}]),
 		Map_Data_Element1 =  maps:put(<<"_mti">>,Mti_Data_Element,maps:new()), 
 		Map_Data_Element = maps:put(<<"_bitmap">>,Bitmap_Data_ELement,Map_Data_Element1),
-		Start_index = ?MTI_SIZE+Bitmap_size,
-		{Map_Data_Element,Start_index};
+		Start_index = ?MTI_SIZE+?PRIMARY_BITMAP_SIZE,
+		
+		OutData = fold_bin(
+			fun(_New_Bin = <<X:1/binary, Rest_bin/binary>>,_Acc = {Data_for_use_in,Index_start_in,Current_index_in,Map_out_list_in}) when X =:= <<"1">> ->
+					{Ftype,Flength,Fx_var_fixed,Fx_header_length,DataElemName} = get_spec_field(Current_index_in),
+					Data_index = case Fx_var_fixed of
+						fx -> 
+							Data_element_fx = binary:part(Data_for_use_in,Index_start_in,Flength),
+							New_Index_fx = Index_start_in+Flength,
+							{Data_element_fx,New_Index_fx};
+						vl ->
+							Header = binary:part(Data_for_use_in,Index_start_in,Fx_header_length),
+							Header_value = erlang:binary_to_integer(Header),
+							Start_val = Index_start_in + Fx_header_length,
+							Data_element_vl = binary:part(Data_for_use_in,Start_val,Header_value),
+							New_Index_vl = Start_val+Header_value,
+							{Data_element_vl,New_Index_vl}
+					end,
+					{Data_element,New_Index} = Data_index,
+					NewData  = maps:from_list([{ftype,Ftype},{fld_no,Current_index_in},{name,DataElemName},{val_binary_form,Data_element}]),
+					NewMap = maps:put(Current_index_in,NewData,Map_out_list_in),
+					Fld_num_out = Current_index_in + 1,
+					{Rest_bin,{Data_for_use_in,New_Index,Fld_num_out,NewMap}};
+				(_New_Bin = <<X:1/binary, Rest_bin/binary>>,_Acc = {Data_for_use_in,Index_start_in,Current_index_in,Map_out_list_in}) when X =:= <<"0">> ->
+					Fld_num_out = Current_index_in + 1,						
+					{Rest_bin,{Data_for_use_in,Index_start_in,Fld_num_out,Map_out_list_in}}
+			end, {Bin_message,Start_index,1,Map_Data_Element},Bitmap_transaction),
+		{_,_,_,FlData} = OutData,
+		%%io:format("~nkeys and values so far are ~p",[FlData]),
+		FlData;
 
 %% @doc this part accepts a 1993 ascii iso8583 message and extracts the mti,bitmap,data elements into a map object 
 %% exceptions can be thrown here if the string for the message hasnt been formatted well but they should be caught in whichever code is calling this function
