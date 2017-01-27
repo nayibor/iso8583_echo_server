@@ -23,7 +23,7 @@
 %% @doc this part is for starting the iso server 
 -spec start_iso_server()->[pid()] | {error,term()}.	
 start_iso_server()->
-		{ok, Listen} = gen_tcp:listen(?PORT, [list, {packet, 0},{active, once}]),
+		{ok, Listen} = gen_tcp:listen(?PORT, [list, {packet, 0},{active, true}]),
 		[spawn(fun() -> loop_listen(Listen) end) || _ <- lists:seq(1,?ACCEPTOR_NUM)].
 
 
@@ -42,7 +42,7 @@ loop_receive(Socket,Isom)->
 				State_new = Isom++Message,
 				case length(State_new) of 
 					Size when Size < ?BH ->
-						inet:setopts(Socket, [{active, once}]),
+						%%inet:setopts(Socket, [{active, once}]),
 						loop_receive(Socket,State_new);
 					_  ->
 						{LenStr, Rest} = lists:split(?BH, State_new),
@@ -51,10 +51,11 @@ loop_receive(Socket,Isom)->
 							SizeafterHead when Len =:= SizeafterHead ->
 								Response_message = process_message({binary,Rest}),
 								io:format("~nParsed Iso Map~n ~p~n",[Response_message]),
-								inet:setopts(Socket, [{active, once}]),
+								gen_tcp:send(Socket,State_new),
+								%%inet:setopts(Socket, [{active, once}]),
 								loop_receive(Socket,[]);
 							SizeafterHead when Len < SizeafterHead ->
-								inet:setopts(Socket, [{active, once}]),
+								%%inet:setopts(Socket, [{active, once}]),
 								loop_receive(Socket,State_new)
 						end
 				end;
@@ -120,7 +121,7 @@ process_message({binary,Rest})->
 		Start_index = ?MTI_SIZE+?PRIMARY_BITMAP_SIZE,
 		
 		OutData = fold_bin(
-			fun(_New_Bin = <<X:1/binary, Rest_bin/binary>>,_Acc = {Data_for_use_in,Index_start_in,Current_index_in,Map_out_list_in}) when X =:= <<"1">> ->
+			fun( <<X:1/binary, Rest_bin/binary>>, {Data_for_use_in,Index_start_in,Current_index_in,Map_out_list_in}) when X =:= <<"1">> ->
 					{Ftype,Flength,Fx_var_fixed,Fx_header_length,DataElemName} = get_spec_field(Current_index_in),
 					Data_index = case Fx_var_fixed of
 						fx -> 
@@ -140,8 +141,8 @@ process_message({binary,Rest})->
 					NewMap = maps:put(Current_index_in,NewData,Map_out_list_in),
 					Fld_num_out = Current_index_in + 1,
 					{Rest_bin,{Data_for_use_in,New_Index,Fld_num_out,NewMap}};
-				(_New_Bin = <<X:1/binary, Rest_bin/binary>>,_Acc = {Data_for_use_in,Index_start_in,Current_index_in,Map_out_list_in}) when X =:= <<"0">> ->
-					Fld_num_out = Current_index_in + 1,						
+				(<<X:1/binary, Rest_bin/binary>>, {Data_for_use_in,Index_start_in,Current_index_in,Map_out_list_in}) when X =:= <<"0">> ->
+					Fld_num_out = Current_index_in + 1,					
 					{Rest_bin,{Data_for_use_in,Index_start_in,Fld_num_out,Map_out_list_in}}
 			end, {Bin_message,Start_index,1,Map_Data_Element},Bitmap_transaction),
 		{_,_,_,FlData} = OutData,

@@ -29,11 +29,11 @@ public class Test_java_client {
 		m.set(43,"Community1");
 		m.set(44, "A5DFGR");
 		m.set(39,"000");
-		//m.set(102,"12341234234");
+		m.set(102,"123412342341341243");
 		m.set(22,"FABCDE123ABD");
 		
 
-		for (int i=1;i<=1;i++)
+		for (int i=1;i<=100;i++)
 		{
 		Date today = new Date();
 		SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("yyMMddHHmmss");
@@ -41,7 +41,7 @@ public class Test_java_client {
 		m.set(12,DATE_FORMAT.format(today));
 		//m.dump(System.out,"\t");
 		channel.send (m);
-		//ISOMsg r = channel.receive ();
+		ISOMsg r = channel.receive ();
 		}
 		
 		channel.disconnect ();
