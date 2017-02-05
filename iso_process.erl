@@ -51,7 +51,7 @@ loop_receive(Socket,Isom)->
 							SizeafterHead when Len =:= SizeafterHead ->
 								Response_message = process_message({binary,Rest}),
 								io:format("~nParsed Iso Map~n ~p~n",[Response_message]),
-								gen_tcp:send(Socket,State_new),
+								ok = gen_tcp:send(Socket,State_new),
 								%%inet:setopts(Socket, [{active, once}]),
 								loop_receive(Socket,[]);
 							SizeafterHead when Len < SizeafterHead ->
@@ -73,14 +73,6 @@ send_message(Message)->
 		gen_tcp:send(Socket,Message),
 		ok = gen_tcp:close(Socket).
 		
-		
-%process_binary(Fun,Accum_i,Init_Bin,Chop_size) when size(Init_Bin) > 0->
-%		 << Bin_i:Chop_size/binary,Rest/binary >> = Init_Bin ,
-%		Accum_new = Fun(Accum_i,Bin_i),
-%		process_binary(Fun,Accum_new,Rest,Chop_size);
-		
-			
-%process_binary(_Fun,Accum_i,<<>>,_Chop_size)-> Accum_i.
 
 
 -spec fold_bin(Fun, T, Bin) -> T when
@@ -95,15 +87,32 @@ fold_bin(Fun, Accum, Bin) ->
 		fold_bin(Fun, NewAccum, NewBin).
 
 
+%%this is for padding a binary up to a length of N digits with a binary character
+%%mostly used in the bitmap
+%%pad character size <2
+
+pad_data(Bin,Number,Character)when is_binary(Bin),is_integer(Number),Number > 0,is_binary(Character),size(Character)<2 -> pad_data(Bin,Number,Character,Number-size(Bin)).
+pad_data(Bin,Number,Character,Counter) when Counter > 0 -> pad_data(<<Character/binary,Bin/binary>>,Number,Character,Counter-1);
+pad_data(Bin,_Number,_Character,Counter) when Counter =< 0 -> Bin.
+
+%%this is for creating correct interpretation of the bitmap for a binary 
+convert_base(Data_Base_16)->
+		Fth_base16 = erlang:binary_to_integer(Data_Base_16,16),
+		erlang:integer_to_binary(Fth_base16,2).
+
+%%this converts data between bases and also pads the data 
+convert_base_pad(Data_Base_16)->
+        Data_base2 = convert_base(Data_Base_16),
+		pad_data(Data_base2,4,<<"0">>).
+
+
 -spec process_message([{list | binary,pos_integer()}])->map().			
 %% @doc this part is for usage of binaries		
 process_message({binary,Rest})-> 
 		 Bin_message = erlang:list_to_binary(Rest),
 		 %%io:format("~nmessageis ~p",[Bin_message]),
 		 Fthdig = binary:part(Bin_message,4,1),
-		 Fth_base16 = erlang:binary_to_integer(Fthdig,16),
-		 Fth_base2 = erlang:integer_to_binary(Fth_base16,2),
-		 Pad_left_z_basetwo  = pad_data(Fth_base2,4,<<"0">>),
+		 Pad_left_z_basetwo = convert_base_pad(Fthdig),
 		 %%io:format("~n4base pad is ~p",[Pad_left_z_basetwo]),
 		 Bitmap_test_num = binary:part(Pad_left_z_basetwo,0,1),
 		 Bitmap_size = case Bitmap_test_num of
@@ -111,7 +120,7 @@ process_message({binary,Rest})->
 							<<"1">> -> 32
 						end,
 		Bitmap_Segment = binary:part(Bin_message,?MTI_SIZE,Bitmap_size),
-		Bitmap_transaction = << << (convert_base(One)):4/binary >>  || <<One:1/binary>> <= Bitmap_Segment >>,
+		Bitmap_transaction = << << (convert_base_pad(One)):4/binary >>  || <<One:1/binary>> <= Bitmap_Segment >>,
 		
 		%%add bitmap as well as mti to map which holds data elements so they can help in processing rules 
 		Mti_Data_Element = maps:from_list([{ftype,ans},{fld_no,0},{name,<<"Mti">>},{val_binary_form,binary:part(Bin_message,0,?MTI_SIZE)}]),
@@ -339,17 +348,4 @@ get_spec_field(DataElem)->
 			126	->{ans,255,vl,3,<<"Reserved For Iso Use">>}				
 		end .
 
-%%this is for padding a binary up to a length of N digits with a binary character
-%%mostly used in the bitmap
-%%pad character size <2
-
-pad_data(Bin,Number,Character)when is_binary(Bin),is_integer(Number),Number > 0,is_binary(Character),size(Character)<2 -> pad_data(Bin,Number,Character,Number-size(Bin)).
-pad_data(Bin,Number,Character,Counter) when Counter > 0 -> pad_data(<<Character/binary,Bin/binary>>,Number,Character,Counter-1);
-pad_data(Bin,_Number,_Character,Counter) when Counter =< 0 -> Bin.
-
-%%this is for creating correct interpretation of the bitmap for a binary 
-convert_base(Data_Base_16)->
-		Fth_base16 = erlang:binary_to_integer(Data_Base_16,16),
-		Data_base2 = erlang:integer_to_binary(Fth_base16,2),
-		pad_data(Data_base2,4,<<"0">>).
 
