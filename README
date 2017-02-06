@@ -1,7 +1,0 @@
-This repository is for teaching the basics of how to process iso8583 transactions using erlang .
-It contains code for doing just that .
-Check it out and tell me what u think !!
-Right now i have added erlang code for parsing messages sent using iso8583 ascii format 
-But later i intend to add code for parsing both xml,binary and other customer formats .
-check it out and give me your comments !!.
-working on the tutorial now 
