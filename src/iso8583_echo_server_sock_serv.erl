@@ -2,7 +2,6 @@
 %%% @doc iso8583_echo_server_sock_serv module.
 %%%<br>this module is responsible for accepting conections from external interfaces and passing it to the asci processor for furthe processing </br>
 %%% @end
-%%% @copyright Nuku Ameyibor <nayibor@startmail.com>
 
 
 -module(iso8583_echo_server_sock_serv).
