@@ -1,1 +1,8 @@
-[].
+[{<<"iso8583_erl">>,
+  {git,"https://github.com/nayibor/iso8583_erl.git",
+       {ref,"26d55d0ec4ebd3592c2bf5e2ba94cadaff4efeef"}},
+  0},
+ {<<"ranch">>,
+  {git,"https://github.com/ninenines/ranch.git",
+       {ref,"a8f31f3f0274f7e5a6b58fa6b6090c3160c4d023"}},
+  0}].
